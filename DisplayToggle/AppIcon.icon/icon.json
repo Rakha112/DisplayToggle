@@ -1,0 +1,64 @@
+{
+  "fill" : {
+    "linear-gradient" : [
+      "display-p3:0.97656,0.97656,0.97301,1.00000",
+      "display-p3:0.20015,0.43442,0.96512,1.00000"
+    ]
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "image-name" : "Rectangle 4.svg",
+          "name" : "Rectangle 4",
+          "position" : {
+            "scale" : 15,
+            "translation-in-points" : [
+              0,
+              542.90625
+            ]
+          }
+        },
+        {
+          "image-name" : "Switch.svg",
+          "name" : "Switch",
+          "position" : {
+            "scale" : 7,
+            "translation-in-points" : [
+              0,
+              86.4609375
+            ]
+          }
+        },
+        {
+          "blend-mode" : "normal",
+          "fill" : "automatic",
+          "glass" : true,
+          "image-name" : "Switch (1).svg",
+          "name" : "Switch (1)",
+          "position" : {
+            "scale" : 7,
+            "translation-in-points" : [
+              0,
+              -222.8046875
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}

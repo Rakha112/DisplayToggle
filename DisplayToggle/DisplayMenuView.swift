@@ -8,12 +8,11 @@
 import SwiftUI
 
 struct DisplayMenuView: View {
-    @StateObject private var displayManager = DisplayManager()
+    @EnvironmentObject var displayManager: DisplayManager
     @State private var isAnimating = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            
             ForEach($displayManager.displays) { $display in
                 HStack {
                     Image(systemName: display.iconName)
@@ -24,10 +23,12 @@ struct DisplayMenuView: View {
                     Toggle("", isOn: $display.isOn)
                         .toggleStyle(.switch)
                         .onChange(of: display.isOn) { _, newState in
-                            if newState {
-                                displayManager.reconnectDisplay(id: display.id)
-                            } else {
-                                displayManager.disconnectDisplay(id: display.id)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                if newState {
+                                    displayManager.reconnectDisplay(id: display.id)
+                                } else {
+                                    displayManager.disconnectDisplay(id: display.id)
+                                }
                             }
                         }
                 }

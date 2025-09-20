@@ -1,3 +1,10 @@
+//
+//  DisplayManager.swift
+//  DisplayToggle
+//
+//  Created by Rakha Wibowo on 18/09/25.
+//
+
 import SwiftUI
 import AppKit
 import CoreGraphics

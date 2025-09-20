@@ -9,12 +9,15 @@ import SwiftUI
 
 @main
 struct DisplayToggleApp: App {
+    @StateObject private var displayManager = DisplayManager()
+
     var body: some Scene {
-         MenuBarExtra {
-             DisplayMenuView()
-         } label: {
-             Image(systemName: "display")
-         }
-         .menuBarExtraStyle(.window)
-     }
+        MenuBarExtra {
+            DisplayMenuView()
+                .environmentObject(displayManager)
+        } label: {
+            Image("MenuBarIcon")
+        }
+        .menuBarExtraStyle(.window)
+    }
 }
