@@ -31,6 +31,10 @@ struct MainMenuView: View {
                                 }
                             }
                         }
+                        .disabled(
+                            displayManager.displays.filter { $0.isOn }.count == 1
+                            && display.isOn
+                        )
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 9)
