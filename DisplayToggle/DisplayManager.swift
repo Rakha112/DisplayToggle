@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import AppKit
 import CoreGraphics
 import Combine
 
@@ -17,15 +16,40 @@ enum DisplayManagerError: Error {
 
 class DisplayManager: ObservableObject {
     @Published var displays: [Display] = []
+    
+    private var isConfiguringInternally: Bool = false
 
     init() {
         loadAndRestoreDisplays()
-    }
-     
-    func refreshDisplays() {
-        loadAndRestoreDisplays()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(screenParametersDidChange),
+            name: NSApplication.didChangeScreenParametersNotification,
+            object: nil
+        )
     }
     
+    
+    @objc private func screenParametersDidChange(notification: NSNotification) {
+        guard !isConfiguringInternally else {
+            print("Screen parameters changed internally, skipping full refresh.")
+            return
+        }
+        
+        print("Screen parameters changed externally! Auto-refreshing display list.")
+        do {
+            let onlineDisplayIDs = try getOnlineDisplayIDs()
+          
+            
+            DispatchQueue.main.async {
+                self.updatePublishedDisplays(from: onlineDisplayIDs)
+            }
+            
+        } catch {
+            print("Failed to load displays: \(error)")
+        }
+    }
+
     func disconnectDisplay(id: CGDirectDisplayID) {
         configureDisplay(id: id, isEnabled: false)
     }
@@ -38,11 +62,14 @@ class DisplayManager: ObservableObject {
         do {
             let allDisplayIDs = try getAllDisplayIDs()
             
+            restoreOfflineDisplays(from: allDisplayIDs)
+            
+            let onlineDisplayIDs = try getOnlineDisplayIDs()
+            
             DispatchQueue.main.async {
-                self.updatePublishedDisplays(from: allDisplayIDs)
+                self.updatePublishedDisplays(from: onlineDisplayIDs)
             }
             
-            restoreOfflineDisplays(from: allDisplayIDs)
             
         } catch {
             print("Failed to load displays: \(error)")
@@ -74,6 +101,14 @@ class DisplayManager: ObservableObject {
     }
 
     private func configureDisplay(id: CGDirectDisplayID, isEnabled: Bool) {
+        self.isConfiguringInternally = true
+
+        defer {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                self.isConfiguringInternally = false
+            }
+        }
+        
         var config: CGDisplayConfigRef?
         guard CGBeginDisplayConfiguration(&config) == .success, let config = config else {
             print("Failed to begin display configuration.")
@@ -85,6 +120,12 @@ class DisplayManager: ObservableObject {
         if status == .success {
             print("\(isEnabled ? "Enable" : "Disable") command for display \(id) sent successfully. Finalizing...")
             CGCompleteDisplayConfiguration(config, .permanently)
+            
+            DispatchQueue.main.async {
+                if let index = self.displays.firstIndex(where: { $0.id == id }) {
+                    self.displays[index].isOn = isEnabled
+                }
+            }
         } else {
             print("Failed to send \(isEnabled ? "enable" : "disable") command. Cancelling. Error: \(status.rawValue)")
             CGCancelDisplayConfiguration(config)
@@ -105,5 +146,30 @@ class DisplayManager: ObservableObject {
         }
 
         return ids
+    }
+    
+    private func getOnlineDisplayIDs() throws -> [CGDirectDisplayID] {
+        var displayCount: UInt32 = 0
+        
+        var result = CGGetOnlineDisplayList(0, nil, &displayCount)
+        guard result == .success else {
+            print("Failed to get online display count. Error: \(result)")
+            throw DisplayManagerError.getDisplayListFailed(result)
+        }
+
+        var onlineIDs = [CGDirectDisplayID](repeating: 0, count: Int(displayCount))
+        
+        result = CGGetOnlineDisplayList(displayCount, &onlineIDs, &displayCount)
+        guard result == .success else {
+            print("Failed to get online display list. Error: \(result)")
+            throw DisplayManagerError.getDisplayListFailed(result)
+        }
+        
+        print("Found \(displayCount) online displays.")
+        return onlineIDs
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 }

@@ -48,7 +48,7 @@ struct MainMenuView: View {
                     displayManager.loadAndRestoreDisplays()
                     try? await Task.sleep(nanoseconds: 500_000_000)
                     await MainActor.run {
-                        displayManager.refreshDisplays()
+                        displayManager.loadAndRestoreDisplays()
                     }
                 }
             }) {
