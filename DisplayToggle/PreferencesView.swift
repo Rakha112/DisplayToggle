@@ -38,21 +38,108 @@ extension View {
 
 struct PreferencesView: View {
     @Binding var currentView: DisplayMenuView.ActiveView
+    @EnvironmentObject var displayManager: DisplayManager
 
     @State private var launchAtLogin = false
     @State private var requiresApproval = false
     @State private var isBusy = false
-
+    
     @Environment(\.scenePhase) private var scenePhase
 
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
+            HStack {
+                Button(action: { currentView = .main }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                        Text("Back")
+                    }
+                }
+                .buttonStyle(.plain)
+                .onHover { hovering in
+                    if hovering {
+                        NSCursor.pointingHand.push()
+                    } else {
+                        NSCursor.pop()
+                    }
+                }
+
+                Spacer()
+            }
+            .overlay(
+                Text("Preferences")
+                    .font(.headline)
+            )
+            .padding(.bottom, 15)
+
+            Divider().padding(.bottom, 12)
+
+            VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Auto launch at login")
+                        Spacer()
+                        Toggle("", isOn: $launchAtLogin)
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                            .disabled(isBusy)
+                            .onChangeCompat(of: launchAtLogin) { _, newValue in
+                                setLaunchAtLogin(newValue)
+                            }
+                    }
+
+                    if requiresApproval {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.yellow)
+                            Text("Requires approval in System Settings > Login Items.")
+                            Spacer()
+                            if #available(macOS 13.0, *) {
+                                Button("Open") {
+                                    SMAppService.openSystemSettingsLoginItems()
+                                }
+                            }
+                        }
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Text("Auto disable built-in display")
+                        Image(systemName: "info.circle")
+                            .foregroundStyle(.secondary)
+                            .help("When an external display is connected, the built-in display will be turned off.")
+                        Spacer()
+                        Toggle("", isOn: $displayManager.autoDisableBuiltInDisplay)
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .onDisappear {
+            currentView = .main
+        }
+        .onChangeCompat(of: scenePhase, initial: true) { _, phase in
+            if phase == .active {
+                refreshLaunchAtLoginStatus()
+            }
+        }
+    }
+    
     private func refreshLaunchAtLoginStatus() {
+        guard #available(macOS 13.0, *) else { return }
         let status = SMAppService.mainApp.status
         launchAtLogin = (status == .enabled)
         requiresApproval = (status == .requiresApproval)
     }
 
     private func setLaunchAtLogin(_ enabled: Bool) {
-        guard !isBusy else { return }
+        guard #available(macOS 13.0, *), !isBusy else { return }
         isBusy = true
         defer { isBusy = false }
 
@@ -69,70 +156,4 @@ struct PreferencesView: View {
 
         refreshLaunchAtLoginStatus()
     }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header
-            HStack {
-                Button(action: { currentView = .main }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                        Text("Back")
-                    }
-                }
-                .buttonStyle(.plain)
-
-                Spacer()
-            }
-            .overlay(
-                Text("Preferences")
-                    .font(.headline)
-            )
-            .padding(.bottom, 15)
-
-            Divider().padding(.bottom, 12)
-
-            // Toggles
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("Auto launch at login")
-                    Spacer()
-                    Toggle("", isOn: $launchAtLogin)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                        .disabled(isBusy)
-                        .onChangeCompat(of: launchAtLogin) { _, newValue in
-                            setLaunchAtLogin(newValue)
-                        }
-                }
-
-                if requiresApproval {
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.yellow)
-                        Text("Requires approval in System Settings > Login Items.")
-                        Spacer()
-                        if #available(macOS 13.0, *) {
-                            Button("Open") {
-                                SMAppService.openSystemSettingsLoginItems()
-                            }
-                        }
-                    }
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                }
-            }
-            .padding(.leading, 4)
-        }
-        .padding(.horizontal, 12)
-        .onDisappear {
-            currentView = .main
-        }
-        .onChangeCompat(of: scenePhase, initial: true) { _, phase in
-            if phase == .active {
-                refreshLaunchAtLoginStatus()
-            }
-        }
-    }
 }
-

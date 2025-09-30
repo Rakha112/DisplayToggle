@@ -18,9 +18,25 @@ class DisplayManager: ObservableObject {
     @Published var displays: [Display] = []
     
     private var isConfiguringInternally: Bool = false
+    
+    @Published var autoDisableBuiltInDisplay: Bool {
+        didSet {
+            UserDefaults.standard.set(autoDisableBuiltInDisplay, forKey: "autoDisableBuiltInDisplay")
+            if autoDisableBuiltInDisplay {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    self.handleAutoDisableBuiltInDisplay()
+                }
+            }
+        }
+    }
 
     init() {
-        loadAndRestoreDisplays()
+        self.autoDisableBuiltInDisplay = UserDefaults.standard.bool(forKey: "autoDisableBuiltInDisplay")
+        loadAndRestoreDisplays {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                self.handleAutoDisableBuiltInDisplay()
+            }
+        }
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(screenParametersDidChange),
@@ -39,14 +55,37 @@ class DisplayManager: ObservableObject {
         print("Screen parameters changed externally! Auto-refreshing display list.")
         do {
             let onlineDisplayIDs = try getOnlineDisplayIDs()
-          
             
             DispatchQueue.main.async {
                 self.updatePublishedDisplays(from: onlineDisplayIDs)
+                self.handleAutoDisableBuiltInDisplay()
             }
             
         } catch {
             print("Failed to load displays: \(error)")
+        }
+    }
+    
+    private func handleAutoDisableBuiltInDisplay() {
+        guard autoDisableBuiltInDisplay else { return }
+        
+        guard let builtIn = displays.first(where: { $0.isBuiltIn }) else {
+            print("No built-in display detected.")
+            return
+        }
+        
+        let externalExists = displays.contains(where: { !$0.isBuiltIn && $0.isOn })
+        
+        if externalExists {
+            if builtIn.isOn {
+                print("External display detected, disabling builtin display...")
+                disconnectDisplay(id: builtIn.id)
+            }
+        } else {
+            if !builtIn.isOn {
+                print("No external display, enabling builtin display...")
+                reconnectDisplay(id: builtIn.id)
+            }
         }
     }
 
@@ -58,7 +97,7 @@ class DisplayManager: ObservableObject {
         configureDisplay(id: id, isEnabled: true)
     }
     
-    func loadAndRestoreDisplays() {
+    func loadAndRestoreDisplays(completion: (() -> Void)? = nil) {
         do {
             let allDisplayIDs = try getAllDisplayIDs()
             
@@ -68,6 +107,7 @@ class DisplayManager: ObservableObject {
             
             DispatchQueue.main.async {
                 self.updatePublishedDisplays(from: onlineDisplayIDs)
+                completion?()
             }
             
             
@@ -102,16 +142,11 @@ class DisplayManager: ObservableObject {
 
     private func configureDisplay(id: CGDirectDisplayID, isEnabled: Bool) {
         self.isConfiguringInternally = true
-
-        defer {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                self.isConfiguringInternally = false
-            }
-        }
         
         var config: CGDisplayConfigRef?
         guard CGBeginDisplayConfiguration(&config) == .success, let config = config else {
             print("Failed to begin display configuration.")
+            self.isConfiguringInternally = false
             return
         }
 
@@ -126,9 +161,14 @@ class DisplayManager: ObservableObject {
                     self.displays[index].isOn = isEnabled
                 }
             }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                self.isConfiguringInternally = false
+            }
         } else {
             print("Failed to send \(isEnabled ? "enable" : "disable") command. Cancelling. Error: \(status.rawValue)")
             CGCancelDisplayConfiguration(config)
+            self.isConfiguringInternally = false
         }
     }
     
